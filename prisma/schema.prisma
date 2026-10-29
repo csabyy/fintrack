@@ -18,7 +18,6 @@ model User {
   categories      Category[]
   preference      UserPreference?
   budgets         Budget[]
-  recurring       RecurringTransaction[]
   bankConnections BankConnection[]
 }
 
@@ -26,7 +25,6 @@ model UserPreference {
   id            String   @id @default(cuid())
   userId        String   @unique
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  baseCurrency  String   @default("EUR")
   weekStartsOn  Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -39,30 +37,10 @@ model Budget {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   amount     Float
-  currency   String   @default("EUR")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([userId, categoryId])
-  @@index([userId])
-}
-
-model RecurringTransaction {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId   String
-  account     BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  categoryId  String?
-  category    Category?   @relation(fields: [categoryId], references: [id])
-  description String
-  amount      Float
-  type        TransactionType @default(EXPENSE)
-  frequency   String   @default("monthly")
-  nextDate    DateTime
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-
   @@index([userId])
 }
 
@@ -73,11 +51,16 @@ model BankConnection {
   bankAccountId     String      @unique
   bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   truelayerAccountId String
+  accountType       String      @default("account") // "account" or "card"
   accessToken       String      @db.Text
   refreshToken      String      @db.Text
   tokenExpiresAt    DateTime
   lastSyncedAt      DateTime?
-  createdAt         DateTime    @default(now())
+  lastSyncAttemptAt DateTime?
+  lastSyncError     String?
+  logoUri           String?
+  consentExpiresAt  DateTime?   // from TrueLayer; the user must reconnect after this
+  createdAt         DateTime    @default(now())  // when the bank was (re)connected
   updatedAt         DateTime    @updatedAt
 
   @@index([userId])
@@ -89,18 +72,30 @@ model BankAccount {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
   bankName     String
-  currency     String        @default("USD")
+  type         AccountType   @default(CURRENT)
   balance      Float         @default(0)
   color        String        @default("#10b981")
+  notes        String?
+  creditLimit  Float?
+  promoEndDate  DateTime?    // credit cards: end of the 0% interest period
+  statementDay  Int?         // credit cards: day of month the statement is issued (1-31)
+  paymentDueDay Int?         // credit cards: day of month the payment is due (1-31)
+  cardNetwork  String?       // e.g. "VISA", "MASTERCARD"
+  lastFourDigits String?
+  validFrom    String?       // YYYY-MM from TrueLayer
+  validTo      String?       // YYYY-MM from TrueLayer
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   transactions Transaction[] @relation("AccountTransactions")
   transfersOut Transaction[] @relation("TransferFrom")
-  statements      Statement[]
-  recurring       RecurringTransaction[]
   bankConnection  BankConnection?
 
   @@index([userId])
+}
+
+enum AccountType {
+  CURRENT
+  CREDIT_CARD
 }
 
 model Transaction {
@@ -142,27 +137,13 @@ model Category {
   createdAt    DateTime      @default(now())
   transactions Transaction[]
   budgets      Budget[]
-  recurring    RecurringTransaction[]
 
   @@unique([userId, name])
   @@index([userId])
 }
 
-model Statement {
-  id          String          @id @default(cuid())
-  accountId   String
-  account     BankAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  fileName    String
-  status      StatementStatus @default(PROCESSING)
-  parsedCount Int             @default(0)
-  errorMsg    String?
-  createdAt   DateTime        @default(now())
-
-  @@index([accountId])
-}
-
-enum StatementStatus {
-  PROCESSING
-  COMPLETED
-  FAILED
+// One-off data fixes in prisma/data-migrations/after-push.sql record themselves here
+model DataMigration {
+  id        String   @id
+  appliedAt DateTime @default(now())
 }

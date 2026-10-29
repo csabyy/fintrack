@@ -8,7 +8,6 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 const budgetSchema = z.object({
   categoryId: z.string(),
   amount: z.number().positive(),
-  currency: z.enum(['EUR', 'USD', 'PKR', 'GBP']).default('EUR'),
 })
 
 export async function GET() {
@@ -61,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const budget = await db.budget.upsert({
       where: { userId_categoryId: { userId: session.user.id, categoryId: data.categoryId } },
-      update: { amount: data.amount, currency: data.currency },
+      update: { amount: data.amount },
       create: { userId: session.user.id, ...data },
       include: { category: true },
     })

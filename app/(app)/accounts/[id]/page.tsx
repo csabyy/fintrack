@@ -4,45 +4,45 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { ArrowLeft, Plus, Edit2, Upload, FileText } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { ArrowLeft, Edit2, CreditCard } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import TransactionTable from '@/components/transactions/TransactionTable'
 import Modal from '@/components/ui/Modal'
-import TransactionForm from '@/components/transactions/TransactionForm'
 import AccountForm from '@/components/accounts/AccountForm'
+import CardSchedule from '@/components/accounts/CardSchedule'
 
 interface AccountDetail {
   id: string
   name: string
   bankName: string
-  currency: string
+  type: 'CURRENT' | 'CREDIT_CARD'
   balance: number
   color: string
+  notes?: string | null
+  creditLimit?: number | null
+  promoEndDate?: string | null
+  statementDay?: number | null
+  paymentDueDay?: number | null
+  cardNetwork?: string | null
+  lastFourDigits?: string | null
+  validFrom?: string | null
+  validTo?: string | null
+  bankConnection?: { id?: string; lastSyncedAt: string | null; accountType?: string } | null
   transactions: Array<any>
-  statements: Array<{ id: string; fileName: string; status: string; parsedCount: number; createdAt: string }>
 }
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [account, setAccount] = useState<AccountDetail | null>(null)
-  const [categories, setCategories] = useState<any[]>([])
-  const [allAccounts, setAllAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAddTx, setShowAddTx] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [activeMonth, setActiveMonth] = useState<string>('')
 
   async function fetchData() {
-    const [accRes, catRes, accsRes] = await Promise.all([
-      fetch(`/api/accounts/${id}`),
-      fetch('/api/categories'),
-      fetch('/api/accounts'),
-    ])
+    const accRes = await fetch(`/api/accounts/${id}`)
     if (!accRes.ok) { router.push('/accounts'); return }
     setAccount(await accRes.json())
-    if (catRes.ok) setCategories(await catRes.json())
-    if (accsRes.ok) setAllAccounts(await accsRes.json())
     setLoading(false)
   }
 
@@ -93,6 +93,8 @@ export default function AccountDetailPage() {
     ? account.transactions.filter(tx => tx.date.slice(0, 7) === activeMonth)
     : account.transactions
 
+  const isCard = account.type === 'CREDIT_CARD'
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -106,8 +108,20 @@ export default function AccountDetailPage() {
               {account.name.slice(0, 2).toUpperCase()}
             </div>
             <div>
-              <h1 className="font-serif text-[1.75rem] leading-tight font-normal text-slate-900">{account.name}</h1>
-              <p className="text-slate-500 text-sm">{account.bankName} · {account.currency}</p>
+              <div className="flex items-center gap-2">
+                <h1 className="font-serif text-[1.75rem] leading-tight font-normal text-slate-900">{account.name}</h1>
+                {isCard && (
+                  <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                    Credit card
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-500 text-sm">
+                {account.bankName}
+                {account.cardNetwork ? ` · ${account.cardNetwork}` : ''}
+                {account.lastFourDigits ? ` (•••• ${account.lastFourDigits})` : ''}
+                {account.validTo ? ` · Exp ${account.validTo}` : ''}
+              </p>
             </div>
           </div>
         </div>
@@ -115,26 +129,82 @@ export default function AccountDetailPage() {
           <button onClick={() => setShowEdit(true)} className="btn-secondary flex items-center gap-2 text-sm">
             <Edit2 size={14} /> Edit
           </button>
-          <Link href="/upload" className="btn-secondary flex items-center gap-2 text-sm">
-            <Upload size={14} /> Import
-          </Link>
-          <button onClick={() => setShowAddTx(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={14} /> Add Transaction
-          </button>
         </div>
       </div>
 
       {/* Balance card */}
       <div className="card p-6" style={{ boxShadow: `inset 3px 0 0 ${account.color}` }}>
-        <p className="text-slate-500 text-sm mb-1">Current balance</p>
+        <p className="text-slate-500 text-sm mb-1">
+          {isCard ? 'Card balance' : 'Current balance'}
+        </p>
         <p className={`font-serif text-5xl leading-tight tabular-nums break-words ${account.balance < 0 ? 'text-red-500' : 'text-brand-500'}`}>
-          {formatCurrency(account.balance, account.currency)}
+          {formatCurrency(account.balance)}
         </p>
         {account.balance < 0 && (
           <p className="text-red-400 text-xs font-medium mt-0.5">Amount owed</p>
         )}
         <p className="text-slate-400 text-sm mt-1">{account.transactions.length} total transactions</p>
+
+        {isCard && (
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <CardSchedule card={account} onEdit={() => setShowEdit(true)} className="max-w-md" />
+          </div>
+        )}
+
+        {/* Credit Limit & Details if available */}
+        {(account.creditLimit || account.cardNetwork || account.lastFourDigits) && (
+          <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <CreditCard size={16} className="text-slate-400" />
+                <span className="font-medium">{account.cardNetwork || 'Credit Card'}</span>
+                {account.lastFourDigits && <span>•••• {account.lastFourDigits}</span>}
+                {account.validTo && <span className="text-slate-400 text-xs">Expires {account.validTo}</span>}
+              </div>
+            </div>
+
+            {account.creditLimit && account.creditLimit > 0 && (
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div className="flex items-center justify-between text-xs text-slate-600 mb-1.5">
+                  <span>Credit Limit: <strong className="text-slate-900">{formatCurrency(account.creditLimit)}</strong></span>
+                  <span>Available Credit: <strong className="text-emerald-600">{formatCurrency(Math.max(0, account.creditLimit - Math.abs(account.balance)))}</strong></span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      Math.abs(account.balance) / account.creditLimit > 0.8
+                        ? 'bg-red-500'
+                        : Math.abs(account.balance) / account.creditLimit > 0.5
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (Math.abs(account.balance) / account.creditLimit) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {((Math.abs(account.balance) / account.creditLimit) * 100).toFixed(1)}% credit utilized
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Notes Card */}
+      {account.notes && (
+        <div className="card p-5 border-l-4 border-l-amber-400 bg-amber-50/40">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-800">Account Notes</span>
+            <button
+              onClick={() => setShowEdit(true)}
+              className="text-xs text-amber-700 hover:text-amber-900 underline"
+            >
+              Edit Note
+            </button>
+          </div>
+          <p className="text-slate-800 text-sm whitespace-pre-line leading-relaxed">{account.notes}</p>
+        </div>
+      )}
 
       {/* Category breakdown chart */}
       {sortedCategories.length > 0 && (
@@ -142,12 +212,13 @@ export default function AccountDetailPage() {
           <h2 className="font-serif text-slate-900 font-medium text-lg mb-4">Spending by category</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={barData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#CBD2D9" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: '#4A5562', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#4A5562', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCurrency(v, account.currency)} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: 'var(--ink-2)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--ink-2)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCurrency(v)} />
               <Tooltip
-                contentStyle={{ background: '#F8F9FA', border: '1px solid #7B8592', borderRadius: '3px', color: '#151B24' }}
-                formatter={(v: number) => [formatCurrency(v, account.currency), 'Spent']}
+                cursor={{ fill: 'var(--rule)' }}
+                contentStyle={{ background: 'var(--card)', border: '1px solid var(--rule-strong)', borderRadius: '3px', color: 'var(--ink)' }}
+                formatter={v => [formatCurrency(Number(v)), 'Spent']}
               />
               <Bar dataKey="amount" radius={[3, 3, 0, 0]}>
                 {barData.map((entry, i) => (
@@ -176,51 +247,11 @@ export default function AccountDetailPage() {
         </div>
         <TransactionTable
           transactions={filteredTx}
-          currency={account.currency}
           onDelete={handleDeleteTx}
         />
       </div>
 
-      {/* Statement history */}
-      {account.statements.length > 0 && (
-        <div className="card p-5">
-          <h2 className="font-serif text-slate-900 font-medium text-lg mb-4">Import history</h2>
-          <div className="space-y-2">
-            {account.statements.map(stmt => (
-              <div key={stmt.id} className="flex items-center gap-3 py-2">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                  <FileText size={14} className="text-slate-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-slate-700 text-sm truncate">{stmt.fileName}</p>
-                  <p className="text-slate-400 text-xs">{formatDate(stmt.createdAt)}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    stmt.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
-                    stmt.status === 'FAILED' ? 'bg-red-50 text-red-700' :
-                    'bg-amber-50 text-amber-700'
-                  }`}>
-                    {stmt.status === 'COMPLETED' ? `✓ ${stmt.parsedCount} imported` : stmt.status.toLowerCase()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Modals */}
-      <Modal open={showAddTx} onClose={() => setShowAddTx(false)} title="Add Transaction" size="md">
-        <TransactionForm
-          accounts={allAccounts}
-          categories={categories}
-          defaultAccountId={account.id}
-          onSuccess={() => { setShowAddTx(false); fetchData() }}
-          onCancel={() => setShowAddTx(false)}
-        />
-      </Modal>
-
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Account" size="md">
         <AccountForm
           initial={account}

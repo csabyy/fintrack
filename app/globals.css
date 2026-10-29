@@ -1,9 +1,64 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Dark mode follows the `dark` class that next-themes puts on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* hmsk.life "Letterpress" A1 Ink Blue (2026-10-21). Fonts and tokens as in HMSK-Tools/_letterpress/letterpress.css;
-   the fonts are self-hosted in public/fonts (OFL), no third-party requests. Colour classes: tailwind.config.js. */
+   the fonts are self-hosted in public/fonts (OFL), no third-party requests.
+   The colour names the components already use (slate, brand, emerald, red, amber, blue) are remapped onto the
+   A1 palette, so every existing class resolves to an A1 colour. Text shades (slate-400 and darker, *-500 and darker)
+   are >= 4.5:1 on paper, paper-2 and card. Every colour is a CSS variable, so `.dark` below re-themes the whole app. */
+@theme static {
+  --color-paper: #EFF1F2; --color-paper-2: #E2E6E9; --color-card: #F8F9FA;
+  --color-ink: #151B24; --color-ink-2: #4A5562; --color-rule: #CBD2D9; --color-rule-strong: #7B8592;
+  --color-accent: #1E4C8A; --color-accent-hover: #163A6B; --color-accent-tint: #DCE6F3; --color-mark: #A8C8F2;
+  /* text on solid accent / status backgrounds, modal + sidebar backdrop, muted chart series */
+  --color-on-accent: #FFFFFF; --color-scrim: #151B24; --color-chart-muted: #6E7F95;
+
+  --color-sidebar: var(--color-paper-2); --color-sidebar-hover: var(--color-paper);
+  --color-sidebar-active: var(--color-card); --color-sidebar-border: var(--color-rule);
+
+  /* neutrals: 50 paper, 100 paper-2, 200 rule (dividers), 300 rule-strong (borders, icons), 400+ text */
+  --color-slate-50: #EFF1F2; --color-slate-100: #E2E6E9; --color-slate-200: #CBD2D9; --color-slate-300: #7B8592;
+  --color-slate-400: #5A6572; --color-slate-500: #4A5562; --color-slate-600: #3D4752; --color-slate-700: #2C3440;
+  --color-slate-800: #1F2630; --color-slate-900: #151B24;
+
+  --color-brand-50: #DCE6F3; --color-brand-100: #C5D5EA; --color-brand-200: #A8C8F2; --color-brand-300: #A8C8F2;
+  --color-brand-400: #4B78B4; --color-brand-500: #1E4C8A; --color-brand-600: #163A6B; --color-brand-700: #122F57;
+
+  --color-blue-50: #DCE6F3; --color-blue-100: #C5D5EA; --color-blue-200: #A8C8F2;
+  --color-blue-500: #1E4C8A; --color-blue-600: #163A6B; --color-blue-700: #163A6B;
+
+  /* status: ok, danger, warn (A1 status hues and their tints) */
+  --color-emerald-50: #E0ECE4; --color-emerald-100: #CADDD0; --color-emerald-200: #A9C7B3;
+  --color-emerald-500: #2B6440; --color-emerald-600: #245637; --color-emerald-700: #245637; --color-emerald-800: #1D452C;
+
+  --color-red-50: #F6E3E2; --color-red-100: #EDCDCB; --color-red-200: #DDA9A6; --color-red-300: #C46E70;
+  --color-red-400: #A3262A; --color-red-500: #A3262A; --color-red-600: #8C1F23; --color-red-700: #7A1B1F;
+
+  --color-amber-50: #F4EAD6; --color-amber-100: #EAD9B8; --color-amber-200: #DDC594;
+  --color-amber-400: #9A6A10; --color-amber-500: #7A4E00; --color-amber-600: #6A4400; --color-amber-700: #7A4E00;
+  --color-amber-800: #5E3C00; --color-amber-900: #78350F;
+
+  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: Newsreader, "Iowan Old Style", Georgia, serif;
+
+  --radius-lg: 4px; --radius-xl: 6px; --radius-2xl: 6px; --radius-3xl: 8px;
+
+  --shadow-soft: 0 30px 60px -40px var(--shadow);
+
+  --animate-fade-in: fadeIn 0.3s ease-in-out;
+  --animate-slide-up: slideUp 0.3s ease-out;
+
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes slideUp {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+}
 
 @font-face { font-family: "Newsreader"; font-style: normal; font-weight: 200 800; font-display: swap;
   src: url("/fonts/newsreader-latin.woff2") format("woff2");
@@ -26,13 +81,56 @@
 
 @layer base {
   :root {
-    --paper: #EFF1F2; --paper-2: #E2E6E9; --card: #F8F9FA;
-    --ink: #151B24; --ink-2: #4A5562; --placeholder: #616C78;
-    --rule: #CBD2D9; --rule-strong: #7B8592;
-    --accent: #1E4C8A; --accent-hover: #163A6B; --accent-tint: #DCE6F3; --mark: #A8C8F2;
-    --danger: #A3262A; --warn: #7A4E00; --ok: #2B6440;
+    --paper: var(--color-paper); --paper-2: var(--color-paper-2); --card: var(--color-card);
+    --ink: var(--color-ink); --ink-2: var(--color-ink-2); --placeholder: #616C78;
+    --rule: var(--color-rule); --rule-strong: var(--color-rule-strong);
+    --accent: var(--color-accent); --accent-hover: var(--color-accent-hover);
+    --accent-tint: var(--color-accent-tint); --mark: var(--color-mark);
+    --danger: var(--color-red-500); --warn: var(--color-amber-500); --ok: var(--color-emerald-500);
     --shadow: rgba(21, 27, 36, .4);
     color-scheme: light;
+  }
+
+  /* Dark "Letterpress": ink-black paper, light ink. Shades keep their role (50-200 tints / dividers,
+     400+ text), so text shades stay >= 4.5:1 on paper, paper-2 and card. Solid fills turn light, so the
+     text on them (on-accent) turns dark. */
+  .dark {
+    --color-paper: #151A21; --color-paper-2: #0F1318; --color-card: #1C232C;
+    --color-ink: #E6EAEE; --color-ink-2: #A9B3BE; --color-rule: #2E3743; --color-rule-strong: #6B7684;
+    --color-accent: #7EA9E8; --color-accent-hover: #A3C3F0; --color-accent-tint: #1B2A40; --color-mark: #2F4C75;
+    --color-on-accent: #0F1318; --color-scrim: #000000; --color-chart-muted: #8C9AAD;
+
+    --color-slate-50: #151A21; --color-slate-100: #0F1318; --color-slate-200: #2E3743; --color-slate-300: #6B7684;
+    --color-slate-400: #8E99A6; --color-slate-500: #A9B3BE; --color-slate-600: #BAC3CC; --color-slate-700: #CBD2D9;
+    --color-slate-800: #D9DEE3; --color-slate-900: #E6EAEE;
+
+    --color-brand-50: #1B2A40; --color-brand-100: #233756; --color-brand-200: #2F4C75; --color-brand-300: #3F6194;
+    --color-brand-400: #6A97D8; --color-brand-500: #7EA9E8; --color-brand-600: #A3C3F0; --color-brand-700: #BDD4F5;
+
+    --color-blue-50: #1B2A40; --color-blue-100: #233756; --color-blue-200: #2F4C75;
+    --color-blue-500: #7EA9E8; --color-blue-600: #A3C3F0; --color-blue-700: #A3C3F0;
+
+    --color-emerald-50: #14281C; --color-emerald-100: #1A3425; --color-emerald-200: #25472F;
+    --color-emerald-500: #6CC08A; --color-emerald-600: #7FCB99; --color-emerald-700: #8FD3A6; --color-emerald-800: #A8DEBA;
+
+    --color-red-50: #2D1618; --color-red-100: #3B1C1F; --color-red-200: #5A2A2E; --color-red-300: #9A4D51;
+    --color-red-400: #EE8486; --color-red-500: #EE8486; --color-red-600: #F3A0A1; --color-red-700: #F6B5B6;
+
+    --color-amber-50: #2A2111; --color-amber-100: #382C15; --color-amber-200: #52411F;
+    --color-amber-400: #D9A94A; --color-amber-500: #E3B862; --color-amber-600: #EAC57C; --color-amber-700: #E3B862;
+    --color-amber-800: #F0D292; --color-amber-900: #F5DFAE;
+
+    --placeholder: #8E99A6;
+    --shadow: rgba(0, 0, 0, .7);
+    color-scheme: dark;
+  }
+
+  /* Tailwind v3 defaults that v4 dropped: borders without a colour use the rule colour, buttons get a pointer */
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-rule, currentColor);
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 
   * {
@@ -82,7 +180,7 @@
   }
   /* one primary (accent), one ghost; disabled stays readable instead of fading */
   .btn-primary {
-    @apply bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-2 rounded-[3px] border border-accent transition-colors duration-150 active:scale-[.97] disabled:bg-paper-2 disabled:text-ink-2 disabled:border-rule-strong disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply bg-accent hover:bg-accent-hover text-on-accent font-semibold px-4 py-2 rounded-[3px] border border-accent transition-colors duration-150 active:scale-[.97] disabled:bg-paper-2 disabled:text-ink-2 disabled:border-rule-strong disabled:cursor-not-allowed disabled:active:scale-100;
   }
   .btn-secondary {
     @apply bg-card hover:bg-paper-2 text-ink font-semibold px-4 py-2 rounded-[3px] border border-rule-strong transition-colors duration-150 active:scale-[.97] disabled:bg-paper-2 disabled:text-ink-2 disabled:cursor-not-allowed disabled:active:scale-100;

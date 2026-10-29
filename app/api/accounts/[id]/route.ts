@@ -4,12 +4,17 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 
+const dayOfMonth = z.number().int().min(1).max(31)
+
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   bankName: z.string().min(1).max(100).optional(),
-  currency: z.string().length(3).optional(),
-  balance: z.number().optional(),
+  type: z.enum(['CURRENT', 'CREDIT_CARD']).optional(),
   color: z.string().optional(),
+  notes: z.string().max(500).optional().nullable(),
+  promoEndDate: z.iso.date().optional().nullable(),
+  statementDay: dayOfMonth.optional().nullable(),
+  paymentDueDay: dayOfMonth.optional().nullable(),
 })
 
 async function getAccount(id: string, userId: string) {
@@ -30,7 +35,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         orderBy: { date: 'desc' },
         include: { category: true, transferTo: { select: { id: true, name: true } } },
       },
-      statements: { orderBy: { createdAt: 'desc' } },
+      bankConnection: {
+        select: { id: true, lastSyncedAt: true, accountType: true },
+      },
     },
   })
 
@@ -48,11 +55,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const body = await req.json()
-    const data = updateSchema.parse(body)
+    const { promoEndDate, ...data } = updateSchema.parse(body)
+    const isCard = (data.type ?? account.type) === 'CREDIT_CARD'
 
     const updated = await db.bankAccount.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        ...(promoEndDate !== undefined && { promoEndDate: promoEndDate ? new Date(promoEndDate) : null }),
+        // Card-only fields are cleared when the account is not a credit card
+        ...(!isCard && { promoEndDate: null, statementDay: null, paymentDueDay: null }),
+      },
     })
 
     return NextResponse.json(updated)

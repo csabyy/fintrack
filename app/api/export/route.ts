@@ -25,18 +25,17 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       category: { select: { name: true } },
-      account: { select: { name: true, bankName: true, currency: true } },
+      account: { select: { name: true, bankName: true } },
     },
     orderBy: { date: 'desc' },
   })
 
   // Build CSV
-  const headers = ['Date', 'Description', 'Amount', 'Currency', 'Type', 'Category', 'Account', 'Bank', 'Notes']
+  const headers = ['Date', 'Description', 'Amount (GBP)', 'Type', 'Category', 'Account', 'Bank', 'Notes']
   const rows = transactions.map(t => [
     format(new Date(t.date), 'yyyy-MM-dd'),
     `"${t.description.replace(/"/g, '""')}"`,
     t.amount.toFixed(2),
-    t.account.currency,
     t.type,
     t.category?.name ?? 'Uncategorized',
     `"${t.account.name}"`,

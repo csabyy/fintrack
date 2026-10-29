@@ -1,19 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search, Download } from 'lucide-react'
+import { Search, Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import TransactionTable from '@/components/transactions/TransactionTable'
-import Modal from '@/components/ui/Modal'
-import TransactionForm from '@/components/transactions/TransactionForm'
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [accounts, setAccounts] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
   const [filters, setFilters] = useState({
     accountId: '',
     month: '',
@@ -30,9 +26,8 @@ export default function TransactionsPage() {
     params.set('limit', LIMIT.toString())
     params.set('offset', offset.toString())
 
-    const [txRes, catRes, accRes] = await Promise.all([
+    const [txRes, accRes] = await Promise.all([
       fetch(`/api/transactions?${params}`),
-      fetch('/api/categories'),
       fetch('/api/accounts'),
     ])
 
@@ -41,7 +36,6 @@ export default function TransactionsPage() {
       setTransactions(data.transactions)
       setTotal(data.total)
     }
-    if (catRes.ok) setCategories(await catRes.json())
     if (accRes.ok) setAccounts(await accRes.json())
     setLoading(false)
   }
@@ -94,10 +88,6 @@ export default function TransactionsPage() {
           >
             <Download size={15} />
             Export
-          </button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={15} />
-            Add Transaction
           </button>
         </div>
       </div>
@@ -210,16 +200,6 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
-
-      {/* Modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Transaction" size="md">
-        <TransactionForm
-          accounts={accounts}
-          categories={categories}
-          onSuccess={() => { setShowAdd(false); fetchData() }}
-          onCancel={() => setShowAdd(false)}
-        />
-      </Modal>
     </div>
   )
 }

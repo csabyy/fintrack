@@ -1,4 +1,4 @@
-import type { BankAccount, Transaction, Category, Statement } from '@prisma/client'
+import type { BankAccount, Transaction, Category } from '@prisma/client'
 
 export type AccountWithTransactions = BankAccount & {
   transactions: Transaction[]

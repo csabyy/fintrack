@@ -56,14 +56,35 @@ export async function GET(req: NextRequest) {
   const tokens = await tokenRes.json()
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000)
 
-  // Use the first account TrueLayer returns for this consent
+  // Discover the TrueLayer resource: try /accounts first, fall back to /cards
+  let truelayerAccountId = 'default'
+  let accountType: 'account' | 'card' = 'account'
+  let cardResult: any = null
+
   const accountsRes = await fetch(`${api}/data/v1/accounts`, {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   })
-  let truelayerAccountId = 'default'
   if (accountsRes.ok) {
     const accountsData = await accountsRes.json()
-    if (accountsData.results?.length > 0) truelayerAccountId = accountsData.results[0].account_id
+    if (accountsData.results?.length > 0) {
+      truelayerAccountId = accountsData.results[0].account_id
+      accountType = 'account'
+    }
+  }
+
+  // If no current/savings account was found, check for credit cards
+  if (truelayerAccountId === 'default') {
+    const cardsRes = await fetch(`${api}/data/v1/cards`, {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    })
+    if (cardsRes.ok) {
+      const cardsData = await cardsRes.json()
+      if (cardsData.results?.length > 0) {
+        cardResult = cardsData.results[0]
+        truelayerAccountId = cardResult.account_id
+        accountType = 'card'
+      }
+    }
   }
 
   await db.bankConnection.upsert({
@@ -72,17 +93,35 @@ export async function GET(req: NextRequest) {
       userId: session.user.id,
       bankAccountId: accountId,
       truelayerAccountId,
+      accountType,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       tokenExpiresAt: expiresAt,
     },
     update: {
       truelayerAccountId,
+      accountType,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       tokenExpiresAt: expiresAt,
+      createdAt: new Date(),
+      consentExpiresAt: null,
     },
   })
+
+  // Store card metadata on the BankAccount if this is a credit card
+  if (accountType === 'card' && cardResult) {
+    await db.bankAccount.update({
+      where: { id: accountId },
+      data: {
+        type: 'CREDIT_CARD',
+        cardNetwork: cardResult.card_network || null,
+        lastFourDigits: cardResult.partial_card_number || null,
+        validFrom: cardResult.valid_from || null,
+        validTo: cardResult.valid_to || null,
+      },
+    })
+  }
 
   // Initial import (errors are non-fatal; the user can press "Sync now")
   await syncBankAccount(accountId).catch(() => null)

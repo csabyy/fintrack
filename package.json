@@ -12,35 +12,37 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
-    "next": "^15.2.4",
-    "react": "^19",
-    "react-dom": "^19",
-    "next-auth": "^4.24.7",
-    "@prisma/client": "^5.16.0",
-    "bcryptjs": "^2.4.3",
-    "pdf-parse": "^1.1.1",
-    "recharts": "^2.12.7",
-    "date-fns": "^3.6.0",
-    "react-dropzone": "^14.2.3",
-    "lucide-react": "^0.408.0",
+    "@hookform/resolvers": "^5.9.2",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.4.0",
-    "zod": "^3.23.8",
-    "react-hook-form": "^7.52.1",
-    "@hookform/resolvers": "^3.9.0"
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.61.0",
+    "next": "^16.4.3",
+    "next-auth": "^4.24.15",
+    "next-themes": "^0.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-hook-form": "^7.91.0",
+    "recharts": "^3.10.1",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "prisma": "^5.16.0",
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/pdf-parse": "^1.1.4",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6"
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.31",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3"
   },
-  "description": "Self-hostable personal finance tracker: accounts, transactions, budgets, recurring payments, PDF statement import and optional TrueLayer bank sync.",
-  "license": "MIT"
+  "description": "Self-hostable personal finance tracker: accounts, transactions, budgets and TrueLayer bank sync.",
+  "license": "MIT",
+  "allowScripts": {
+    "@prisma/client": true,
+    "prisma": true,
+    "@prisma/engines": true
+  }
 }

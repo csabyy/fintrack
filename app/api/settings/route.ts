@@ -12,7 +12,6 @@ const profileSchema = z.object({
 })
 
 const prefSchema = z.object({
-  baseCurrency: z.enum(['EUR', 'USD', 'PKR', 'GBP']).optional(),
   weekStartsOn: z.number().int().min(0).max(1).optional(),
 })
 

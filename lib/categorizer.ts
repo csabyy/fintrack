@@ -241,12 +241,5 @@ export function detectTransactionType(
   ]
   if (transferKeywords.some(k => lower.includes(k))) return 'TRANSFER'
 
-  const incomeKeywords = [
-    'salary', 'payroll', 'deposit', 'income', 'credit', 'refund',
-    'cashback', 'bonus', 'dividend', 'gehalt', 'lohn', 'zinsen',
-    'salário', 'rendimento', 'crédito',
-  ]
-  if (amount > 0 || incomeKeywords.some(k => lower.includes(k))) return 'INCOME'
-
-  return 'EXPENSE'
+  return amount > 0 ? 'INCOME' : 'EXPENSE'
 }

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: process.env.TRUELAYER_CLIENT_ID!,
-    scope: 'info accounts balance transactions offline_access',
+    scope: 'info accounts balance cards transactions offline_access',
     redirect_uri: redirectUri(),
     providers: truelayerProviders(),
     state,

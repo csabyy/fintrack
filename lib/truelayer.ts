@@ -73,8 +73,53 @@ export type SyncResult =
   | { success: true; imported: number; total: number }
   | { success: false; error: string; status: number }
 
-/** Pull the last 90 days of transactions + current balance for one linked account. */
+const DAY_MS = 24 * 60 * 60 * 1000
+// UK banks (e.g. Lloyds) only return data older than 90 days within 5 minutes of the user's bank login.
+const MAX_HISTORY_DAYS = 89
+// Re-fetch this much before the last sync so late-posting transactions are not missed.
+const SYNC_OVERLAP_DAYS = 14
+
+/** Signed amount from the account holder's view: money in is positive, money out negative. */
+function signedAmount(tx: { amount: number; transaction_type?: string }, resourceType: 'accounts' | 'cards'): number {
+  const amount = Math.abs(Number(tx.amount))
+  if (tx.transaction_type === 'CREDIT') return amount
+  if (tx.transaction_type === 'DEBIT') return -amount
+  // TrueLayer cards report purchases as positive amounts
+  return resourceType === 'cards' ? -Number(tx.amount) : Number(tx.amount)
+}
+
+/** Syncs one linked account and records the outcome on its connection (shown in the UI). */
 export async function syncBankAccount(accountId: string): Promise<SyncResult> {
+  let result: SyncResult
+  try {
+    result = await runSync(accountId)
+  } catch (error) {
+    console.error('Bank sync crashed', { accountId, error })
+    result = { success: false, error: 'Unexpected error while syncing', status: 500 }
+  }
+
+  await db.bankConnection.updateMany({
+    where: { bankAccountId: accountId },
+    data: { lastSyncAttemptAt: new Date(), lastSyncError: result.success ? null : result.error },
+  })
+  return result
+}
+
+/** Bank logo and consent expiry from TrueLayer's /me endpoint. */
+async function fetchProviderInfo(api: string, accessToken: string) {
+  const res = await fetch(`${api}/data/v1/me`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!res.ok) return null
+  const me = (await res.json()).results?.[0]
+  const logo = me?.provider?.logo_uri
+  const expires = me?.consent_expires_at ? new Date(me.consent_expires_at) : null
+  return {
+    logoUri: typeof logo === 'string' && logo.startsWith('https://') ? logo : null,
+    consentExpiresAt: expires && !isNaN(expires.getTime()) ? expires : null,
+  }
+}
+
+/** Pull recent transactions (up to 89 days) + current balance for one linked account. */
+async function runSync(accountId: string): Promise<SyncResult> {
   if (!isBankSyncEnabled()) {
     return { success: false, error: 'Bank sync is not configured', status: 404 }
   }
@@ -96,37 +141,72 @@ export async function syncBankAccount(accountId: string): Promise<SyncResult> {
   }
 
   const api = truelayerHosts().api
-  const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const to = new Date().toISOString().split('T')[0]
+
+  const provider = await fetchProviderInfo(api, accessToken).catch(() => null)
+  if (provider && (provider.logoUri || provider.consentExpiresAt)) {
+    await db.bankConnection.update({
+      where: { id: connection.id },
+      data: {
+        ...(provider.logoUri && { logoUri: provider.logoUri }),
+        ...(provider.consentExpiresAt && { consentExpiresAt: provider.consentExpiresAt }),
+      },
+    })
+  }
+  // Use the correct TrueLayer resource path: /accounts for current/savings, /cards for credit cards
+  const resourceType = connection.accountType === 'card' ? 'cards' : 'accounts'
+  const now = Date.now()
+  const earliest = now - MAX_HISTORY_DAYS * DAY_MS
+  const fromMs = connection.lastSyncedAt
+    ? Math.max(earliest, connection.lastSyncedAt.getTime() - SYNC_OVERLAP_DAYS * DAY_MS)
+    : earliest
+  const from = new Date(fromMs).toISOString().split('T')[0]
+  const to = new Date(now).toISOString().split('T')[0]
 
   const txRes = await fetch(
-    `${api}/data/v1/accounts/${connection.truelayerAccountId}/transactions?from=${from}&to=${to}`,
+    `${api}/data/v1/${resourceType}/${connection.truelayerAccountId}/transactions?from=${from}&to=${to}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!txRes.ok) {
-    return { success: false, error: 'Failed to fetch transactions from bank', status: 502 }
+    const body = await txRes.text()
+    console.error('Failed to fetch transactions from TrueLayer', {
+      status: txRes.status,
+      statusText: txRes.statusText,
+      headers: Object.fromEntries(txRes.headers.entries()),
+      body,
+    })
+    if (body.includes('sca_exceeded')) {
+      return { success: false, error: 'Your bank asked to re-authenticate. Disconnect and connect the bank again.', status: 403 }
+    }
+    return { success: false, error: `Failed to fetch transactions from bank (HTTP ${txRes.status})`, status: 502 }
   }
 
   const txData = await txRes.json()
   const transactions = txData.results || []
 
   const balanceRes = await fetch(
-    `${api}/data/v1/accounts/${connection.truelayerAccountId}/balance`,
+    `${api}/data/v1/${resourceType}/${connection.truelayerAccountId}/balance`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (balanceRes.ok) {
     const balanceData = await balanceRes.json()
-    const balance = balanceData.results?.[0]?.current
-    if (balance !== undefined) {
-      await db.bankAccount.update({ where: { id: accountId }, data: { balance } })
+    const balanceResult = balanceData.results?.[0]
+    const balance = balanceResult?.current
+    const updateData: Record<string, any> = {}
+    // Card `current` is the amount owed, stored as a negative balance
+    if (balance !== undefined) updateData.balance = resourceType === 'cards' ? -balance : balance
+    if (resourceType === 'cards' && balanceResult?.credit_limit !== undefined) {
+      updateData.creditLimit = balanceResult.credit_limit
+    }
+    if (Object.keys(updateData).length > 0) {
+      await db.bankAccount.update({ where: { id: accountId }, data: updateData })
     }
   }
 
   const existingTxs = await db.transaction.findMany({
     where: { accountId, importedFrom: { startsWith: 'truelayer:' } },
-    select: { importedFrom: true },
+    select: { id: true, importedFrom: true, amount: true, type: true },
   })
-  const existingIds = new Set(existingTxs.map(t => t.importedFrom))
+  const existingById = new Map(existingTxs.map(t => [t.importedFrom, t]))
 
   const userCategories = await db.category.findMany({
     where: { userId: connection.userId },
@@ -137,11 +217,18 @@ export async function syncBankAccount(accountId: string): Promise<SyncResult> {
   let imported = 0
   for (const tx of transactions) {
     const truelayerId = `truelayer:${tx.transaction_id}`
-    if (existingIds.has(truelayerId)) continue
-
-    const amount = tx.amount // TrueLayer: positive = credit, negative = debit
+    const amount = signedAmount(tx, resourceType)
     const description = tx.description || tx.merchant_name || 'Bank transaction'
     const type = detectTransactionType(description, amount)
+
+    const existing = existingById.get(truelayerId)
+    if (existing) {
+      if (existing.amount !== amount || existing.type !== type) {
+        await db.transaction.update({ where: { id: existing.id }, data: { amount, type } })
+      }
+      continue
+    }
+
     const detectedCategory = autoDetectCategory(description)
     const categoryId = categoryMap.get(detectedCategory.toLowerCase()) ?? null
 
@@ -150,7 +237,7 @@ export async function syncBankAccount(accountId: string): Promise<SyncResult> {
         accountId,
         date: new Date(tx.timestamp),
         description: description.slice(0, 200),
-        amount: type === 'EXPENSE' ? -Math.abs(amount) : Math.abs(amount),
+        amount,
         type,
         ...(categoryId ? { categoryId } : {}),
         importedFrom: truelayerId,

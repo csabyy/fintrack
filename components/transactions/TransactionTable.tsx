@@ -11,7 +11,7 @@ interface Transaction {
   amount: number
   type: string
   category?: { name: string; color: string; icon?: string } | null
-  account?: { name: string; currency: string; color: string }
+  account?: { name: string; color: string }
   transferTo?: { name: string } | null
   notes?: string | null
 }
@@ -20,7 +20,6 @@ interface TransactionTableProps {
   transactions: Transaction[]
   showAccount?: boolean
   onDelete?: (id: string) => void
-  currency?: string
 }
 
 const typeConfig = {
@@ -33,14 +32,13 @@ export default function TransactionTable({
   transactions,
   showAccount = false,
   onDelete,
-  currency = 'USD',
 }: TransactionTableProps) {
   if (transactions.length === 0) {
     return (
       <div className="text-center py-16 text-slate-400">
         <ArrowLeftRight className="w-10 h-10 mx-auto mb-3 opacity-30" />
         <p className="font-medium">No transactions yet</p>
-        <p className="text-sm mt-1">Add your first transaction or import a bank statement</p>
+        <p className="text-sm mt-1">Connect a bank on the Accounts page to import transactions</p>
       </div>
     )
   }
@@ -50,7 +48,6 @@ export default function TransactionTable({
       {transactions.map(tx => {
         const config = typeConfig[tx.type as keyof typeof typeConfig] || typeConfig.EXPENSE
         const Icon = config.icon
-        const txCurrency = tx.account?.currency || currency
 
         return (
           <div
@@ -94,7 +91,7 @@ export default function TransactionTable({
                 tx.type === 'INCOME' ? 'text-emerald-600' : tx.type === 'TRANSFER' ? 'text-blue-600' : 'text-slate-900'
               )}>
                 {tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : ''}
-                {formatCurrency(Math.abs(tx.amount), txCurrency)}
+                {formatCurrency(Math.abs(tx.amount))}
               </p>
             </div>
 

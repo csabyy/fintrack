@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // Always fetch ALL accounts so the toggle list is always complete
   const accounts = await db.bankAccount.findMany({
     where: { userId: session.user.id },
-    select: { id: true, name: true, balance: true, currency: true, color: true, bankName: true },
+    select: { id: true, name: true, balance: true, color: true, bankName: true },
     orderBy: { createdAt: 'asc' },
   })
 
@@ -34,14 +34,14 @@ export async function GET(req: NextRequest) {
         account: accountFilter,
         date: { gte: monthStart, lte: monthEnd },
       },
-      select: { amount: true, type: true, account: { select: { currency: true } } },
+      select: { amount: true, type: true },
     }),
 
     db.transaction.findMany({
       where: { account: accountFilter },
       include: {
         category: true,
-        account: { select: { id: true, name: true, currency: true, color: true } },
+        account: { select: { id: true, name: true, color: true } },
       },
       orderBy: { date: 'desc' },
       take: 10,
@@ -59,30 +59,22 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
-  // ── Monthly income/expenses per currency (filtered) ────────────────────
-  const monthlyIncomeByCurrency: Record<string, number> = {}
-  const monthlyExpensesByCurrency: Record<string, number> = {}
+  // ── Monthly income/expenses (filtered) ───────────────────────────────────
+  let monthlyIncome = 0
+  let monthlyExpenses = 0
   for (const t of currentMonthTx) {
-    const cur = (t as any).account?.currency || 'EUR'
-    if (t.type === 'INCOME') {
-      monthlyIncomeByCurrency[cur] = (monthlyIncomeByCurrency[cur] || 0) + t.amount
-    } else if (t.type === 'EXPENSE') {
-      monthlyExpensesByCurrency[cur] = (monthlyExpensesByCurrency[cur] || 0) + Math.abs(t.amount)
-    }
+    if (t.type === 'INCOME') monthlyIncome += t.amount
+    else if (t.type === 'EXPENSE') monthlyExpenses += Math.abs(t.amount)
   }
 
-  // ── 6-month chart — filtered accounts, EUR only ────────────────────────
-  const eurAccountFilter = selectedIds
-    ? { userId: session.user.id, id: { in: selectedIds }, currency: 'EUR' }
-    : { userId: session.user.id, currency: 'EUR' }
-
+  // ── 6-month chart (filtered) ─────────────────────────────────────────────
   const monthlyData = await Promise.all(
     Array.from({ length: 6 }, (_, i) => {
       const date = subMonths(now, 5 - i)
       const start = startOfMonth(date)
       const end = endOfMonth(date)
       return db.transaction.findMany({
-        where: { account: eurAccountFilter, date: { gte: start, lte: end } },
+        where: { account: accountFilter, date: { gte: start, lte: end } },
         select: { amount: true, type: true },
       }).then(txs => ({
         month: format(date, 'MMM'),
@@ -111,8 +103,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     accounts,                      // always all accounts
-    monthlyIncomeByCurrency,       // filtered
-    monthlyExpensesByCurrency,     // filtered
+    monthlyIncome,                 // filtered
+    monthlyExpenses,               // filtered
     recentTransactions: recentTx,  // filtered
     monthlyData,                   // filtered
     categoryBreakdown: enrichedCategories, // filtered

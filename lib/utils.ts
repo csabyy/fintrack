@@ -1,20 +1,22 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { format, isToday, isYesterday } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-    }).format(amount)
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`
-  }
+const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+
+export function formatCurrency(amount: number): string {
+  return gbp.format(amount)
+}
+
+/** "Today 06:01", "Yesterday 06:01" or "27 Oct 06:01" */
+export function formatSyncTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const day = isToday(d) ? 'Today' : isYesterday(d) ? 'Yesterday' : format(d, 'd MMM')
+  return `${day} ${format(d, 'HH:mm')}`
 }
 
 export function formatDate(date: Date | string): string {
@@ -42,15 +44,6 @@ export function getMonthYear(date: Date | string): string {
   }).format(d)
 }
 
-export function parseAmount(raw: string): number {
-  // Handle European formats: 1.234,56 → 1234.56
-  if (/^\d{1,3}(\.\d{3})*(,\d{2})?$/.test(raw.trim())) {
-    return parseFloat(raw.replace(/\./g, '').replace(',', '.'))
-  }
-  // Handle US formats: 1,234.56 → 1234.56
-  return parseFloat(raw.replace(/,/g, ''))
-}
-
 export function getInitials(name: string): string {
   return name
     .split(' ')
@@ -59,13 +52,6 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2)
 }
-
-export const CURRENCIES = [
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'PKR', symbol: '₨', name: 'Pakistani Rupee' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-]
 
 export const ACCOUNT_COLORS = [
   '#1E4C8A', // accent blue

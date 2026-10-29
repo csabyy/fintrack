@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Sidebar from './Sidebar'
-import QuickAddFAB from './QuickAddFAB'
+import SyncFailureBanner from './SyncFailureBanner'
 import { Menu } from 'lucide-react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -24,19 +24,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-brand-500 rounded-[3px] flex items-center justify-center">
-              <span className="font-serif text-white text-sm">F</span>
+              <span className="font-serif text-on-accent text-sm">F</span>
             </div>
             <span className="font-serif text-xl text-slate-900">FinTrack</span>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-24 lg:pb-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
+          <SyncFailureBanner />
           {children}
         </div>
       </main>
-
-      {/* Quick-add FAB */}
-      <QuickAddFAB />
     </div>
   )
 }

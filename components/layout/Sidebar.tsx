@@ -4,15 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { cn, getInitials } from '@/lib/utils'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 import {
   LayoutDashboard,
   CreditCard,
   ArrowLeftRight,
-  Upload,
   Settings,
   LogOut,
   TrendingUp,
-  RefreshCw,
   X,
 } from 'lucide-react'
 
@@ -20,8 +19,6 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/accounts', label: 'Accounts', icon: CreditCard },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { href: '/recurring', label: 'Recurring', icon: RefreshCw },
-  { href: '/upload', label: 'Import Statement', icon: Upload },
 ]
 
 interface SidebarProps {
@@ -39,7 +36,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
       <div className="px-6 py-6 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-brand-500 rounded-md flex items-center justify-center flex-shrink-0">
-            <TrendingUp className="w-5 h-5 text-white" />
+            <TrendingUp className="w-5 h-5 text-on-accent" />
           </div>
           <div>
             <p className="font-serif text-slate-900 text-2xl leading-none">FinTrack</p>
@@ -91,6 +88,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           )}
         </Link>
 
+        <ThemeToggle className="mx-1 my-2" />
+
         <div className="flex items-center gap-3 px-3 py-2 mt-1">
           <div className="w-8 h-8 bg-brand-50 border border-brand-500 rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-brand-500 text-xs font-bold">
@@ -124,7 +123,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
       {mobileOpen && (
         <>
           <div
-            className="fixed inset-0 bg-ink/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-scrim/50 z-40 lg:hidden"
             onClick={onMobileClose}
           />
           <div className="fixed left-0 top-0 z-50 h-screen lg:hidden">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { User, Lock, Tag, Sliders, Plus, Pencil, Trash2, Check, X, Target } from 'lucide-react'
-import { cn, CURRENCIES, ACCOUNT_COLORS, formatCurrency } from '@/lib/utils'
+import { cn, ACCOUNT_COLORS, formatCurrency } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
 
 const CATEGORY_ICONS = ['🏠', '🚗', '🛒', '🍽️', '☕', '✈️', '💊', '🎮', '📚', '👗', '💼', '🎁', '💡', '📱', '🏋️', '🐾', '🎵', '🏦', '📦', '💰', '🔧', '🌿']
@@ -329,7 +329,7 @@ function CategoriesTab({ categories, onChanged }: { categories: any[]; onChanged
                   key={color}
                   onClick={() => setNewColor(color)}
                   style={{ backgroundColor: color }}
-                  className={cn('w-7 h-7 rounded-full transition-all', newColor === color ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'hover:scale-105')}
+                  className={cn('w-7 h-7 rounded-full transition-all', newColor === color ? 'ring-2 ring-offset-2 ring-offset-card ring-slate-400 scale-110' : 'hover:scale-105')}
                 />
               ))}
             </div>
@@ -351,7 +351,6 @@ function CategoriesTab({ categories, onChanged }: { categories: any[]; onChanged
 
 // ─── Preferences Tab ───────────────────────────────────────────────────────────
 function PreferencesTab({ preference, onSaved }: { preference: any; onSaved: () => void }) {
-  const [currency, setCurrency] = useState(preference?.baseCurrency ?? 'EUR')
   const [weekStart, setWeekStart] = useState(preference?.weekStartsOn ?? 1)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -361,7 +360,7 @@ function PreferencesTab({ preference, onSaved }: { preference: any; onSaved: () 
     const res = await fetch('/api/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'preferences', baseCurrency: currency, weekStartsOn: weekStart }),
+      body: JSON.stringify({ action: 'preferences', weekStartsOn: weekStart }),
     })
     setSaving(false)
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); onSaved() }
@@ -375,28 +374,6 @@ function PreferencesTab({ preference, onSaved }: { preference: any; onSaved: () 
       </div>
 
       <div className="space-y-5">
-        <div>
-          <label className="text-sm font-medium text-slate-700 block mb-1.5">Base currency</label>
-          <p className="text-xs text-slate-400 mb-3">Used for main balance display on the dashboard</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {CURRENCIES.map(c => (
-              <button
-                key={c.code}
-                onClick={() => setCurrency(c.code)}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all',
-                  currency === c.code
-                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                )}
-              >
-                <span className="text-base">{c.symbol}</span>
-                <span>{c.code}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div>
           <label className="text-sm font-medium text-slate-700 block mb-1.5">Week starts on</label>
           <div className="flex gap-2">
@@ -432,7 +409,7 @@ function PreferencesTab({ preference, onSaved }: { preference: any; onSaved: () 
 // ─── Budgets Tab ──────────────────────────────────────────────────────────────
 function BudgetsTab({ data, onChanged }: { data: { budgets: any[]; categories: any[] }; onChanged: () => void }) {
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ categoryId: '', amount: '', currency: 'EUR' })
+  const [form, setForm] = useState({ categoryId: '', amount: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -445,10 +422,10 @@ function BudgetsTab({ data, onChanged }: { data: { budgets: any[]; categories: a
     const res = await fetch('/api/budgets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categoryId: form.categoryId, amount: parseFloat(form.amount), currency: form.currency }),
+      body: JSON.stringify({ categoryId: form.categoryId, amount: parseFloat(form.amount) }),
     })
     setSaving(false)
-    if (res.ok) { setShowAdd(false); setForm({ categoryId: '', amount: '', currency: 'EUR' }); setError(''); onChanged() }
+    if (res.ok) { setShowAdd(false); setForm({ categoryId: '', amount: '' }); setError(''); onChanged() }
     else { const d = await res.json(); setError(d.error ?? 'Failed') }
   }
 
@@ -496,7 +473,7 @@ function BudgetsTab({ data, onChanged }: { data: { budgets: any[]; categories: a
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={cn('text-sm font-semibold', over ? 'text-red-500' : 'text-slate-600')}>
-                        {formatCurrency(b.spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
+                        {formatCurrency(b.spent)} / {formatCurrency(b.amount)}
                       </span>
                       <button onClick={() => deleteBudget(b.categoryId)} className="p-1 text-slate-300 hover:text-red-400 transition-colors">
                         <Trash2 size={13} />
@@ -511,8 +488,8 @@ function BudgetsTab({ data, onChanged }: { data: { budgets: any[]; categories: a
                   </div>
                   <p className={cn('text-xs', over ? 'text-red-500 font-medium' : 'text-slate-400')}>
                     {over
-                      ? `⚠ ${formatCurrency(Math.abs(b.remaining), b.currency)} over budget this month`
-                      : `${formatCurrency(b.remaining, b.currency)} remaining — ${pct}% used`}
+                      ? `⚠ ${formatCurrency(Math.abs(b.remaining))} over budget this month`
+                      : `${formatCurrency(b.remaining)} remaining — ${pct}% used`}
                   </p>
                 </div>
               )
@@ -531,17 +508,9 @@ function BudgetsTab({ data, onChanged }: { data: { budgets: any[]; categories: a
               {availableCats.map(c => <option key={c.id} value={c.id}>{c.icon ?? '📦'} {c.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Monthly limit</label>
-              <input type="number" min="1" step="1" className="input" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="e.g. 500" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Currency</label>
-              <select className="input" value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}>
-                {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Monthly limit (£)</label>
+            <input type="number" min="1" step="1" className="input" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="e.g. 500" />
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setShowAdd(false); setError('') }} className="btn-secondary flex-1 text-sm">Cancel</button>

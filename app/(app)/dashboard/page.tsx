@@ -6,39 +6,32 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, Plus, ChevronRight, Upload, Loader2, Target } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Plus, ChevronRight, Loader2, Target } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import TransactionTable from '@/components/transactions/TransactionTable'
-import Modal from '@/components/ui/Modal'
-import TransactionForm from '@/components/transactions/TransactionForm'
 
 interface Account {
   id: string
   name: string
   balance: number
-  currency: string
   color: string
   bankName: string
 }
 
 interface DashboardData {
   accounts: Account[]
-  monthlyIncomeByCurrency: Record<string, number>
-  monthlyExpensesByCurrency: Record<string, number>
+  monthlyIncome: number
+  monthlyExpenses: number
   recentTransactions: any[]
   monthlyData: Array<{ month: string; income: number; expenses: number }>
   categoryBreakdown: Array<{ name: string; total: number; color: string; icon: string; count: number }>
 }
-
-const CURRENCY_ORDER = ['EUR', 'GBP', 'USD', 'PKR']
 
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chartsLoading, setChartsLoading] = useState(false)
-  const [showAddTx, setShowAddTx] = useState(false)
-  const [categories, setCategories] = useState<any[]>([])
   const [budgets, setBudgets] = useState<any[]>([])
 
   // Selected account IDs — null means "all"
@@ -54,9 +47,8 @@ export default function DashboardPage() {
 
   // Initial load
   async function fetchAll() {
-    const [dashRes, catRes, budgetRes] = await Promise.all([
+    const [dashRes, budgetRes] = await Promise.all([
       fetch('/api/dashboard'),
-      fetch('/api/categories'),
       fetch('/api/budgets'),
     ])
     if (dashRes.ok) {
@@ -64,7 +56,6 @@ export default function DashboardPage() {
       setData(d)
       setSelectedIds(new Set(d.accounts.map((a: Account) => a.id)))
     }
-    if (catRes.ok) setCategories(await catRes.json())
     if (budgetRes.ok) { const b = await budgetRes.json(); setBudgets(b.budgets ?? []) }
     setLoading(false)
   }
@@ -82,8 +73,8 @@ export default function DashboardPage() {
           ...prev,
           monthlyData: d.monthlyData,
           categoryBreakdown: d.categoryBreakdown,
-          monthlyIncomeByCurrency: d.monthlyIncomeByCurrency,
-          monthlyExpensesByCurrency: d.monthlyExpensesByCurrency,
+          monthlyIncome: d.monthlyIncome,
+          monthlyExpenses: d.monthlyExpenses,
           recentTransactions: d.recentTransactions,
         } : d)
       }
@@ -150,15 +141,12 @@ export default function DashboardPage() {
           </div>
           <h2 className="font-serif text-2xl font-normal text-slate-900 mb-2">Welcome to FinTrack!</h2>
           <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-            Your personal finance manager is ready. Start by adding your bank accounts —
-            then import statements, track spending, and set budgets.
+            Your personal finance manager is ready. Add your accounts and connect them to your bank —
+            then track spending and set budgets.
           </p>
           <div className="space-y-2">
             <Link href="/accounts" className="btn-primary flex items-center justify-center gap-2 w-full">
               <Plus size={16} /> Add your first account
-            </Link>
-            <Link href="/upload" className="btn-secondary flex items-center justify-center gap-2 w-full">
-              <Upload size={15} /> Import bank statement
             </Link>
           </div>
           <div className="mt-6 pt-6 border-t border-rule grid grid-cols-3 gap-4 text-center">
@@ -180,20 +168,17 @@ export default function DashboardPage() {
   }
 
   const { accounts, recentTransactions, monthlyData, categoryBreakdown,
-          monthlyIncomeByCurrency, monthlyExpensesByCurrency } = data
+          monthlyIncome, monthlyExpenses } = data
 
   // ── Client-side derived values from selection ──────────────────────────
   const selectedAccounts = accounts.filter(a => selectedIds.has(a.id))
   const allIds = accounts.map(a => a.id)
   const allSelected = selectedIds.size === allIds.length
 
-  // Balance per currency — instant client-side calculation
-  const balanceByCurrency: Record<string, number> = {}
-  for (const a of selectedAccounts) {
-    balanceByCurrency[a.currency] = (balanceByCurrency[a.currency] || 0) + a.balance
-  }
-
-  const activeCurrencies = CURRENCY_ORDER.filter(c => balanceByCurrency[c] !== undefined)
+  // Balance of the selected accounts — instant client-side calculation
+  const balance = selectedAccounts.reduce((s, a) => s + a.balance, 0)
+  const net = monthlyIncome - monthlyExpenses
+  const hasActivity = monthlyIncome > 0 || monthlyExpenses > 0
 
   // Recent transactions — filter client-side instantly
   const filteredTx = recentTransactions.filter(
@@ -208,59 +193,34 @@ export default function DashboardPage() {
           <h1 className="font-serif text-[2rem] leading-tight font-normal text-slate-900">Dashboard</h1>
           <p className="text-slate-500 text-sm mt-0.5">Your financial overview</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/upload" className="btn-secondary flex items-center gap-2 text-sm">
-            <Upload size={15} /> Import
-          </Link>
-          <button onClick={() => setShowAddTx(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={15} /> Add Transaction
-          </button>
-        </div>
       </div>
 
-      {/* Balance cards — per currency, from selected accounts */}
-      <div className={`grid gap-4 ${
-        activeCurrencies.length === 1 ? 'grid-cols-1 sm:grid-cols-2' :
-        activeCurrencies.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-        activeCurrencies.length === 3 ? 'grid-cols-1 sm:grid-cols-3' :
-        'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-      }`}>
-        {activeCurrencies.map(currency => {
-          const balance = balanceByCurrency[currency] ?? 0
-          const income = monthlyIncomeByCurrency[currency] ?? 0
-          const expenses = monthlyExpensesByCurrency[currency] ?? 0
-          const net = income - expenses
-          const hasActivity = income > 0 || expenses > 0
-          return (
-            <div key={currency} className="card p-5 min-w-0">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-9 h-9 bg-brand-50 text-brand-500 rounded-md flex items-center justify-center">
-                  <Wallet size={18} />
-                </div>
-                <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider border border-rule-strong px-2 py-0.5 rounded-full">
-                  {currency}
-                </span>
-              </div>
-              <p className="eyebrow">Balance</p>
-              <p className="font-serif text-[2rem] text-brand-500 mt-1 leading-tight tabular-nums break-words">{formatCurrency(balance, currency)}</p>
-              {hasActivity && (
-                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-rule">
-                  <div className="flex items-center gap-1.5">
-                    <TrendingUp size={12} className="text-slate-500" />
-                    <span className="text-slate-500 text-xs tabular-nums">{formatCurrency(income, currency)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <TrendingDown size={12} className="text-slate-500" />
-                    <span className="text-slate-500 text-xs tabular-nums">{formatCurrency(expenses, currency)}</span>
-                  </div>
-                  <span className={`ml-auto text-xs font-semibold tabular-nums ${net >= 0 ? 'text-emerald-700' : 'text-red-500'}`}>
-                    {net >= 0 ? '+' : ''}{formatCurrency(net, currency)}
-                  </span>
-                </div>
-              )}
+      {/* Balance card — from selected accounts */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        <div className="card p-5 min-w-0">
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-9 h-9 bg-brand-50 text-brand-500 rounded-md flex items-center justify-center">
+              <Wallet size={18} />
             </div>
-          )
-        })}
+          </div>
+          <p className="eyebrow">Balance</p>
+          <p className="font-serif text-[2rem] text-brand-500 mt-1 leading-tight tabular-nums break-words">{formatCurrency(balance)}</p>
+          {hasActivity && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-rule">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp size={12} className="text-slate-500" />
+                <span className="text-slate-500 text-xs tabular-nums">{formatCurrency(monthlyIncome)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <TrendingDown size={12} className="text-slate-500" />
+                <span className="text-slate-500 text-xs tabular-nums">{formatCurrency(monthlyExpenses)}</span>
+              </div>
+              <span className={`ml-auto text-xs font-semibold tabular-nums ${net >= 0 ? 'text-emerald-700' : 'text-red-500'}`}>
+                {net >= 0 ? '+' : ''}{formatCurrency(net)}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Charts row */}
@@ -271,32 +231,32 @@ export default function DashboardPage() {
             <h2 className="font-serif text-slate-900 font-medium text-lg">Income vs Expenses — 6 months</h2>
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
               <span className="flex items-center gap-1.5 text-xs text-slate-500"><i className="w-4 h-0.5 bg-brand-500" />Income</span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-500"><i className="w-4 border-t-2 border-dashed border-[#6E7F95]" />Expenses</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-500"><i className="w-4 border-t-2 border-dashed border-chart-muted" />Expenses</span>
               {chartsLoading && <Loader2 size={13} className="text-slate-400 animate-spin" />}
-              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">EUR accounts</span>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={monthlyData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1E4C8A" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#1E4C8A" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6E7F95" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#6E7F95" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--color-chart-muted)" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="var(--color-chart-muted)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#CBD2D9" />
-              <XAxis dataKey="month" tick={{ fill: '#4A5562', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#4A5562', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(0)}k`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rule)" />
+              <XAxis dataKey="month" tick={{ fill: 'var(--ink-2)', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--ink-2)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{ background: '#F8F9FA', border: '1px solid #7B8592', borderRadius: '3px', boxShadow: '0 12px 30px -16px rgba(21,27,36,.4)', color: '#151B24' }}
-                formatter={(v: number) => [formatCurrency(v, 'EUR'), '']}
+                cursor={{ stroke: 'var(--rule)' }}
+                contentStyle={{ background: 'var(--card)', border: '1px solid var(--rule-strong)', borderRadius: '3px', boxShadow: '0 12px 30px -16px var(--shadow)', color: 'var(--ink)' }}
+                formatter={v => [formatCurrency(Number(v)), '']}
               />
-              <Area type="monotone" dataKey="income" stroke="#1E4C8A" strokeWidth={2} fill="url(#incomeGrad)" name="Income" />
-              <Area type="monotone" dataKey="expenses" stroke="#6E7F95" strokeWidth={2} strokeDasharray="5 3" fill="url(#expenseGrad)" name="Expenses" />
+              <Area type="monotone" dataKey="income" stroke="var(--accent)" strokeWidth={2} fill="url(#incomeGrad)" name="Income" />
+              <Area type="monotone" dataKey="expenses" stroke="var(--color-chart-muted)" strokeWidth={2} strokeDasharray="5 3" fill="url(#expenseGrad)" name="Expenses" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -311,7 +271,7 @@ export default function DashboardPage() {
             <>
               <ResponsiveContainer width="100%" height={130}>
                 <PieChart>
-                  <Pie data={categoryBreakdown} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="total" stroke="#F8F9FA" strokeWidth={2}>
+                  <Pie data={categoryBreakdown} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="total" stroke="var(--card)" strokeWidth={2}>
                     {categoryBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                 </PieChart>
@@ -321,7 +281,7 @@ export default function DashboardPage() {
                   <div key={cat.name} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                     <span className="text-xs text-slate-600 flex-1 truncate">{cat.icon} {cat.name}</span>
-                    <span className="text-xs font-semibold text-slate-800">{formatCurrency(cat.total, 'EUR')}</span>
+                    <span className="text-xs font-semibold text-slate-800">{formatCurrency(cat.total)}</span>
                   </div>
                 ))}
               </div>
@@ -368,7 +328,7 @@ export default function DashboardPage() {
                     isSelected ? 'bg-brand-500 border-brand-500' : 'border-rule-strong bg-card'
                   }`}>
                     {isSelected && (
-                      <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none">
+                      <svg className="w-2.5 h-2.5 text-on-accent" viewBox="0 0 10 8" fill="none">
                         <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     )}
@@ -389,9 +349,8 @@ export default function DashboardPage() {
 
                   <div className="text-right flex-shrink-0">
                     <p className={`text-sm font-semibold ${account.balance < 0 ? 'text-red-500' : 'text-slate-900'}`}>
-                      {formatCurrency(account.balance, account.currency)}
+                      {formatCurrency(account.balance)}
                     </p>
-                    <p className="text-slate-400 text-xs">{account.currency}</p>
                   </div>
                 </div>
               )
@@ -442,7 +401,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-slate-700">{b.category?.name ?? 'Unknown'}</span>
                     </div>
                     <span className={cn('text-xs font-semibold', over ? 'text-red-500' : 'text-slate-500')}>
-                      {formatCurrency(b.spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
+                      {formatCurrency(b.spent)} / {formatCurrency(b.amount)}
                     </span>
                   </div>
                   <div className="h-2 bg-slate-100 border border-rule rounded-full overflow-hidden">
@@ -452,7 +411,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <p className={cn('text-xs', over ? 'text-red-500 font-medium' : 'text-slate-400')}>
-                    {over ? `${formatCurrency(Math.abs(b.remaining), b.currency)} over budget` : `${formatCurrency(b.remaining, b.currency)} remaining`}
+                    {over ? `${formatCurrency(Math.abs(b.remaining))} over budget` : `${formatCurrency(b.remaining)} remaining`}
                   </p>
                 </div>
               )
@@ -460,15 +419,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      <Modal open={showAddTx} onClose={() => setShowAddTx(false)} title="Add Transaction" size="md">
-        <TransactionForm
-          accounts={accounts}
-          categories={categories}
-          onSuccess={() => { setShowAddTx(false); fetchAll() }}
-          onCancel={() => setShowAddTx(false)}
-        />
-      </Modal>
     </div>
   )
 }
