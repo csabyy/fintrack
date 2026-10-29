@@ -194,7 +194,7 @@ async function runSync(accountId: string): Promise<SyncResult> {
     const updateData: Record<string, any> = {}
     // Card `current` is the amount owed, stored as a negative balance
     if (balance !== undefined) updateData.balance = resourceType === 'cards' ? -balance : balance
-    if (resourceType === 'cards' && balanceResult?.credit_limit !== undefined) {
+    if (resourceType === 'cards' && typeof balanceResult?.credit_limit === 'number') {
       updateData.creditLimit = balanceResult.credit_limit
     }
     if (Object.keys(updateData).length > 0) {

@@ -23,6 +23,7 @@ interface AccountFormProps {
     color?: string | null
     notes?: string | null
     promoEndDate?: string | null
+    creditLimit?: number | null
     statementDay?: number | null
     paymentDueDay?: number | null
   } | null
@@ -38,6 +39,7 @@ export default function AccountForm({ onSuccess, onCancel, initial }: AccountFor
     color: initial?.color || ACCOUNT_COLORS[0],
     notes: initial?.notes || '',
     promoEndDate: initial?.promoEndDate?.slice(0, 10) || '',
+    creditLimit: initial?.creditLimit?.toString() || '',
     statementDay: initial?.statementDay?.toString() || '',
     paymentDueDay: initial?.paymentDueDay?.toString() || '',
   })
@@ -62,6 +64,7 @@ export default function AccountForm({ onSuccess, onCancel, initial }: AccountFor
           color: form.color,
           notes: form.notes,
           promoEndDate: isCard && form.promoEndDate ? form.promoEndDate : null,
+          creditLimit: isCard && parseFloat(form.creditLimit) > 0 ? parseFloat(form.creditLimit) : null,
           statementDay: isCard && form.statementDay ? parseInt(form.statementDay, 10) : null,
           paymentDueDay: isCard && form.paymentDueDay ? parseInt(form.paymentDueDay, 10) : null,
         }),
@@ -133,6 +136,20 @@ export default function AccountForm({ onSuccess, onCancel, initial }: AccountFor
 
       {isCard && (
         <div className="space-y-3 rounded-xl border border-rule p-3">
+          <div>
+            <label className="label">Credit limit (£)</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              inputMode="decimal"
+              value={form.creditLimit}
+              onChange={e => setForm(f => ({ ...f, creditLimit: e.target.value }))}
+              placeholder="e.g. 5000"
+              className="input"
+            />
+            <p className="text-xs text-slate-400 mt-1">A limit reported by your bank replaces this on the next sync.</p>
+          </div>
           <div>
             <label className="label">0% rate ends</label>
             <input

@@ -13,6 +13,7 @@ const updateSchema = z.object({
   color: z.string().optional(),
   notes: z.string().max(500).optional().nullable(),
   promoEndDate: z.iso.date().optional().nullable(),
+  creditLimit: z.number().positive().optional().nullable(),
   statementDay: dayOfMonth.optional().nullable(),
   paymentDueDay: dayOfMonth.optional().nullable(),
 })
@@ -64,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         ...data,
         ...(promoEndDate !== undefined && { promoEndDate: promoEndDate ? new Date(promoEndDate) : null }),
         // Card-only fields are cleared when the account is not a credit card
-        ...(!isCard && { promoEndDate: null, statementDay: null, paymentDueDay: null }),
+        ...(!isCard && { promoEndDate: null, statementDay: null, paymentDueDay: null, creditLimit: null }),
       },
     })
 

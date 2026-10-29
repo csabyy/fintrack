@@ -13,6 +13,7 @@ const accountSchema = z.object({
   color: z.string().default('#1E4C8A'),
   notes: z.string().max(500).optional().nullable(),
   promoEndDate: z.iso.date().optional().nullable(),
+  creditLimit: z.number().positive().optional().nullable(),
   statementDay: dayOfMonth.optional().nullable(),
   paymentDueDay: dayOfMonth.optional().nullable(),
 })
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { promoEndDate, statementDay, paymentDueDay, ...data } = accountSchema.parse(body)
+    const { promoEndDate, statementDay, paymentDueDay, creditLimit, ...data } = accountSchema.parse(body)
     const isCard = data.type === 'CREDIT_CARD'
 
     const account = await db.bankAccount.create({
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
         promoEndDate: isCard && promoEndDate ? new Date(promoEndDate) : null,
         statementDay: isCard ? statementDay ?? null : null,
         paymentDueDay: isCard ? paymentDueDay ?? null : null,
+        creditLimit: isCard ? creditLimit ?? null : null,
         userId: session.user.id,
       },
     })
